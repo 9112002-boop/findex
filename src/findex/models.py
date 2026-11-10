@@ -1,7 +1,6 @@
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from functools import cached_property
-from collections.abc import Mapping
-from typing import Iterator
 
 
 @dataclass(frozen=True, slots=True)

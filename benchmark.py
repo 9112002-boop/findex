@@ -1,8 +1,13 @@
-import time
 import os
-import psutil
+import sys
+import time
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
+
+import psutil
+
 from findex.index import InvertedIndex, build_partial
+
 
 def run_benchmark(executor_type: str, workers: int, files: list[Path]):
     num_workers = workers if workers > 0 else os.cpu_count() or 1
@@ -16,17 +21,15 @@ def run_benchmark(executor_type: str, workers: int, files: list[Path]):
         for i, chunk in enumerate(chunks):
             partials.append(build_partial(chunk, start_doc_id=i * chunk_size))
     elif executor_type == "threads":
-        from concurrent.futures import ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=num_workers) as pool:
             futures = [pool.submit(build_partial, chunk, i * chunk_size) for i, chunk in enumerate(chunks)]
             partials = [f.result() for f in futures]
     elif executor_type == "processes":
-        from concurrent.futures import ProcessPoolExecutor
         with ProcessPoolExecutor(max_workers=num_workers) as pool:
             futures = [pool.submit(build_partial, chunk, i * chunk_size) for i, chunk in enumerate(chunks)]
             partials = [f.result() for f in futures]
     merge_start = time.perf_counter()
-    final_index = InvertedIndex.merge(partials)
+    InvertedIndex.merge(partials)
     merge_time = time.perf_counter() - merge_start
     end_wall = time.perf_counter()
     end_cpu = time.process_time()
@@ -39,12 +42,13 @@ def run_benchmark(executor_type: str, workers: int, files: list[Path]):
         "merge": merge_time,
     }
 
+
 if __name__ == "__main__":
     data_dir = Path("data")
     files = sorted(data_dir.glob("*.txt"))
     if not files:
         print("No files found.")
-        exit(1)
+        sys.exit(1)
     print(f"Benchmarking on {len(files)} files...")
     print(f"{'Executor':<10} | {'Workers':<7} | {'Wall (s)':<8} | {'CPU (s)':<8} | {'RSS (MB)':<8} | {'Merge (s)':<9}")
     print("-" * 70)

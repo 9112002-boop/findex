@@ -30,8 +30,7 @@ def generate_corpus(num_files: int = 20, size_per_file_mb: float = 3.0) -> None:
         filename = data_dir / f"doc{i:02d}.txt"
 
         with open(filename, "w", encoding="utf-8") as f:
-            for _ in range(repetitions):
-                f.write(base_text + "\n")
+            f.writelines(base_text + "\n" for _ in range(repetitions))
 
         size_mb = os.path.getsize(filename) / (1024 * 1024)
         print(f"Створено {filename}: {size_mb:.2f} MB")

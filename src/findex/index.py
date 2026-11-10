@@ -4,7 +4,6 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from .iterators import iter_documents
 from .models import DocMeta, Posting
 from .tokenizer import tokenize
 
