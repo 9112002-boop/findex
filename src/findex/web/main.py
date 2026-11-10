@@ -1,15 +1,15 @@
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
-import logging
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from ..models import Index
-from ..storage import load_pickle
 from ..search import search
+from ..storage import load_pickle
 
 logger = logging.getLogger("findex.web")
 
