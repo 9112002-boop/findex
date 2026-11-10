@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from functools import cached_property
 from collections.abc import Mapping
-from typing import List, Iterator
+from typing import List, Iterator, Any
 
 @dataclass(frozen=True, slots=True)
 class DocMeta:
@@ -20,11 +20,10 @@ class SearchResult:
     doc_id: int
     snippet: str = ""
 
-class Index(Mapping):
-    """Обгортка над словником постінгів, що реалізує протокол Mapping."""
-    def __init__(self, postings: dict, doc_meta: dict):
-        self._postings = postings
-        self.doc_meta = doc_meta
+class Index(Mapping[str, List[Posting]]):
+    def __init__(self, postings: dict[str, List[Posting]], doc_meta: dict[int, DocMeta]) -> None:
+        self._postings: dict[str, List[Posting]] = postings
+        self.doc_meta: dict[int, DocMeta] = doc_meta
 
     def __getitem__(self, term: str) -> List[Posting]:
         return self._postings[term]
@@ -34,9 +33,6 @@ class Index(Mapping):
 
     def __len__(self) -> int:
         return len(self._postings)
-
-    def __repr__(self) -> str:
-        return f"<Index: {len(self)} terms, {len(self.doc_meta)} docs>"
 
     @property
     def num_docs(self) -> int:
@@ -50,5 +46,4 @@ class Index(Mapping):
         return total_len / len(self.doc_meta)
 
     def df(self, term: str) -> int:
-        """Document Frequency - кількість документів, де зустрічається термін."""
         return len(self._postings.get(term, []))

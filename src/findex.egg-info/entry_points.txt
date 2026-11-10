@@ -1,0 +1,2 @@
+[console_scripts]
+findex = findex.__main__:app
