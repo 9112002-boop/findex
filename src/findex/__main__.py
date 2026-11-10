@@ -1,19 +1,18 @@
-import asyncio
-import json
-import logging
-import os
-import sys
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
-from pathlib import Path
-
 import typer
+import logging
+import sys
+import json
+import os
+import asyncio
+from pathlib import Path
 from rich.console import Console
 from rich.table import Table
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
 from .index import InvertedIndex, build_partial
-from .models import Index
-from .search import search
-from .storage import load_pickle, save_pickle
+from .storage import save_pickle, load_pickle
+from .models import Index, SearchResult
+from .search import search, make_snippet
 
 # Налаштування логування (діагностика йде в stderr)
 logging.basicConfig(
@@ -86,7 +85,7 @@ def index(
 def search_cmd(
         index_file: Path = typer.Argument(..., help="Path to index file"),
         query: str = typer.Argument(..., help="Search query"),
-        scorer: str = typer.Option("tfidf", "--scorer", help="Ranking algorithm (tfidf or bm25)"),
+        scorer: str = typer.Option("tfidf", "--scorer", help="Ranking algorithm (tfidf, bm25, numpy)"),
         json_out: bool = typer.Option(False, "--json", help="Output results as JSON")
 ) -> None:
     """Search the index with a query."""
@@ -105,7 +104,20 @@ def search_cmd(
             for i, text in enumerate(iter_documents(data_dir)):
                 corpus_dict[i] = text
 
-        results = search(idx, query, scorer_type=scorer, corpus_dict=corpus_dict)
+        results = []
+        if scorer == "numpy":
+            from .scorers_numpy import BM25ScorerNumpy
+            scorer_obj = BM25ScorerNumpy(idx)
+            terms = [t.lower() for t in query.split() if t.isalnum()]
+            raw_results = scorer_obj.score(terms, k=10)
+
+            for doc_id, score in raw_results:
+                snip = ""
+                if corpus_dict and doc_id in corpus_dict:
+                    snip = make_snippet(corpus_dict[doc_id], terms)
+                results.append(SearchResult(score=round(score, 4), doc_id=doc_id, snippet=snip))
+        else:
+            results = search(idx, query, scorer_type=scorer, corpus_dict=corpus_dict)
 
         if json_out:
             output = [{"doc_id": r.doc_id, "score": r.score, "snippet": r.snippet} for r in results]
@@ -179,14 +191,7 @@ def serve(
         raise typer.Exit(code=1)
 
     console.print(f"[bold green]Starting web server on http://0.0.0.0:{port} with {workers} workers...[/bold green]")
-
-    # Запуск uvicorn
-    uvicorn.run(
-        "findex.web.main:app",
-        host="0.0.0.0",
-        port=port,
-        workers=workers,
-    )
+    uvicorn.run("findex.web.main:app", host="0.0.0.0", port=port, workers=workers)
 
 
 if __name__ == "__main__":
