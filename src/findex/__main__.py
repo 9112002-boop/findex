@@ -1,11 +1,11 @@
-import typer
+import json
 import logging
 import sys
-import json
 from pathlib import Path
+
+import typer
 from rich.console import Console
 from rich.table import Table
-from rich.progress import track
 
 # Налаштування логування (діагностика йде в stderr)
 logging.basicConfig(
@@ -20,9 +20,9 @@ console = Console()
 
 # Тут будуть імпорти ваших модулів
 from .index import InvertedIndex
-from .storage import save_pickle, load_pickle
 from .models import Index
 from .search import search
+from .storage import load_pickle, save_pickle
 
 
 @app.callback()
@@ -113,7 +113,7 @@ def stats(index_file: Path = typer.Argument(..., help="Path to index file")):
     data = load_pickle(index_file)
     idx = Index(postings=data['postings'], doc_meta=data['doc_meta'])
 
-    console.print(f"[bold]Index Statistics[/bold]")
+    console.print("[bold]Index Statistics[/bold]")
     console.print(f"Documents: {idx.num_docs}")
     console.print(f"Unique Terms: {len(idx)}")
     console.print(f"Avg Doc Length: {idx.avg_doc_length:.2f}")

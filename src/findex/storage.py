@@ -3,6 +3,7 @@ import time
 import tracemalloc
 from pathlib import Path
 
+
 def save_pickle(index, filepath: Path):
     tracemalloc.start()
     start = time.perf_counter()

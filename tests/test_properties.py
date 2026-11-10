@@ -1,5 +1,8 @@
-from hypothesis import given, strategies as st
+from hypothesis import given
+from hypothesis import strategies as st
+
 from findex.tokenizer import tokenize
+
 
 @given(st.text())
 def test_tokenize_never_crashes(text: str):

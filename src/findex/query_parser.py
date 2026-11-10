@@ -1,6 +1,6 @@
-import re
 from dataclasses import dataclass
-from typing import List, Set, Union
+from typing import Union
+
 from .models import Index
 
 
@@ -9,7 +9,7 @@ from .models import Index
 class Term:
     value: str
 
-    def evaluate(self, index: Index) -> Set[int]:
+    def evaluate(self, index: Index) -> set[int]:
         return {p.doc_id for p in index.get(self.value, [])}
 
     def __and__(self, other): return And(self, other)
@@ -23,7 +23,7 @@ class Term:
 class Phrase:
     value: str
 
-    def evaluate(self, index: Index) -> Set[int]:
+    def evaluate(self, index: Index) -> set[int]:
         # Спрощена реалізація: шукаємо просто як AND слів (без позицій для простоти)
         words = self.value.lower().split()
         if not words: return set()
@@ -47,7 +47,7 @@ class And:
     left: Union[Term, Phrase, 'And', 'Or', 'Not']
     right: Union[Term, Phrase, 'And', 'Or', 'Not']
 
-    def evaluate(self, index: Index) -> Set[int]:
+    def evaluate(self, index: Index) -> set[int]:
         return self.left.evaluate(index) & self.right.evaluate(index)
 
 
@@ -56,7 +56,7 @@ class Or:
     left: Union[Term, Phrase, 'And', 'Or', 'Not']
     right: Union[Term, Phrase, 'And', 'Or', 'Not']
 
-    def evaluate(self, index: Index) -> Set[int]:
+    def evaluate(self, index: Index) -> set[int]:
         return self.left.evaluate(index) | self.right.evaluate(index)
 
 
@@ -64,7 +64,7 @@ class Or:
 class Not:
     child: Union[Term, Phrase, 'And', 'Or', 'Not']
 
-    def evaluate(self, index: Index) -> Set[int]:
+    def evaluate(self, index: Index) -> set[int]:
         all_docs = set(index.doc_meta.keys())
         return all_docs - self.child.evaluate(index)
 
@@ -75,9 +75,8 @@ class Not:
     def __invert__(self): return Not(self)
 
 
-def parse_query(query: str) -> Union[Term, Phrase, And, Or, Not]:
+def parse_query(query: str) -> Term | Phrase | And | Or | Not:
     """Дуже спрощений парсер (без токенізатора, просто розбиває по пробілах)."""
-    tokens = re.findall(r'"[^"]+"|\w+|AND|OR|NOT|[()]', query)
 
     def parse_expression(pos):
         # Тут має бути повноцінний рекурсивний спуск.

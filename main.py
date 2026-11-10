@@ -1,6 +1,8 @@
 from pathlib import Path
-from stats import collect_stats
+
 from greedy_stats import collect_stats_greedy
+from stats import collect_stats
+
 
 def main():
     data_dir = Path('data')

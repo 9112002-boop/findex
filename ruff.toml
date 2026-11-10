@@ -1,0 +1,4 @@
+ignore = [
+    "B008",   # Typer requires calls in defaults
+    "BLE001", # CLI needs to catch all exceptions
+]

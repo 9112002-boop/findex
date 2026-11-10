@@ -1,22 +1,21 @@
-from collections import defaultdict
-from pathlib import Path
-from typing import Dict, List
 import time
 import tracemalloc
+from collections import defaultdict
+from pathlib import Path
 
 # Зверніть увагу на крапку перед iterators та tokenizer.
 # Це означає, що ми шукаємо їх у тій самій папці (src/findex)
 from .iterators import iter_documents
+from .models import DocMeta, Posting
 from .tokenizer import tokenize
-from .models import Posting, DocMeta
 
 
 class InvertedIndex:
     def __init__(self):
         # термін -> список постінгів
-        self.postings: Dict[str, List[Posting]] = defaultdict(list)
-        self.doc_meta: Dict[int, DocMeta] = {}
-        self.doc_lengths: Dict[int, int] = {}
+        self.postings: dict[str, list[Posting]] = defaultdict(list)
+        self.doc_meta: dict[int, DocMeta] = {}
+        self.doc_lengths: dict[int, int] = {}
 
     def build(self, data_dir: Path):
         tracemalloc.start()
@@ -46,7 +45,7 @@ class InvertedIndex:
         for term in self.postings:
             self.postings[term].sort(key=lambda x: x.doc_id)
 
-        current, peak = tracemalloc.get_traced_memory()
+        _current, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
         elapsed = time.perf_counter() - start_time
 

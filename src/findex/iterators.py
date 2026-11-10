@@ -1,5 +1,6 @@
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
+
 
 def iter_documents(data_dir: str | Path) -> Generator[str, None, None]:
     data_path = Path(data_dir)

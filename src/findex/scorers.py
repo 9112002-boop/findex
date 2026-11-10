@@ -1,5 +1,5 @@
 import math
-from typing import List, Dict
+
 from .models import Index
 
 
@@ -7,7 +7,7 @@ class TfIdfScorer:
     def __init__(self, index: Index):
         self.index = index
 
-    def score(self, query_terms: List[str]) -> Dict[int, float]:
+    def score(self, query_terms: list[str]) -> dict[int, float]:
         scores = {}
         N = self.index.num_docs
         if N == 0:
@@ -41,7 +41,7 @@ class BM25Scorer:
         self.k1 = k1
         self.b = b
 
-    def score(self, query_terms: List[str]) -> Dict[int, float]:
+    def score(self, query_terms: list[str]) -> dict[int, float]:
         scores = {}
         N = self.index.num_docs
         avgdl = self.index.avg_doc_length

@@ -1,7 +1,7 @@
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from functools import cached_property
-from collections.abc import Mapping
-from typing import List, Iterator, Any
+
 
 @dataclass(frozen=True, slots=True)
 class DocMeta:
@@ -20,12 +20,12 @@ class SearchResult:
     doc_id: int
     snippet: str = ""
 
-class Index(Mapping[str, List[Posting]]):
-    def __init__(self, postings: dict[str, List[Posting]], doc_meta: dict[int, DocMeta]) -> None:
-        self._postings: dict[str, List[Posting]] = postings
+class Index(Mapping[str, list[Posting]]):
+    def __init__(self, postings: dict[str, list[Posting]], doc_meta: dict[int, DocMeta]) -> None:
+        self._postings: dict[str, list[Posting]] = postings
         self.doc_meta: dict[int, DocMeta] = doc_meta
 
-    def __getitem__(self, term: str) -> List[Posting]:
+    def __getitem__(self, term: str) -> list[Posting]:
         return self._postings[term]
 
     def __iter__(self) -> Iterator[str]:

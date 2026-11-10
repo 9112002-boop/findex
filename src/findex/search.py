@@ -1,15 +1,16 @@
-import time
 import heapq
-from functools import wraps, lru_cache
-from typing import List, Dict, Callable
+import time
+from collections.abc import Callable
+from functools import wraps
+from typing import Any
+
 from .models import Index, SearchResult
-from .scorers import TfIdfScorer, BM25Scorer
-from .query_parser import parse_query
+from .scorers import BM25Scorer, TfIdfScorer
 
 
-def timed(func: Callable):
+def timed(func: Callable[..., Any]) -> Callable[..., Any]:
     @wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
         start = time.perf_counter()
         result = func(*args, **kwargs)
         elapsed = time.perf_counter() - start
@@ -19,7 +20,7 @@ def timed(func: Callable):
     return wrapper
 
 
-def make_snippet(text: str, query_terms: List[str], window: int = 80) -> str:
+def make_snippet(text: str, query_terms: list[str], window: int = 80) -> str:
     """Створює сніпет навколо першого входження терміна."""
     text_lower = text.lower()
     for term in query_terms:
@@ -37,8 +38,13 @@ def make_snippet(text: str, query_terms: List[str], window: int = 80) -> str:
 
 
 @timed
-def search(index: Index, query: str, scorer_type: str = "tfidf", top_k: int = 10, corpus_dict: dict = None) -> List[
-    SearchResult]:
+def search(
+    index: Index,
+    query: str,
+    scorer_type: str = "tfidf",
+    top_k: int = 10,
+    corpus_dict: dict[int, str] | None = None,
+) -> list[SearchResult]:
     """Головна функція пошуку з ранжуванням."""
     # Оцінка
     if scorer_type == "bm25":

@@ -1,4 +1,5 @@
 from typer.testing import CliRunner
+
 from findex.__main__ import app
 
 runner = CliRunner()

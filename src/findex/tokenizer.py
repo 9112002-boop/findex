@@ -1,6 +1,6 @@
 import re
 import unicodedata
-from typing import Iterator
+from collections.abc import Iterator
 
 TOKEN_PATTERN = re.compile(r"[\w']+(?:-[\w']+)*", re.UNICODE)
 
