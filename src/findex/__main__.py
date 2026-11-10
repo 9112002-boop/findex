@@ -1,19 +1,18 @@
-import asyncio
-import json
-import logging
-import os
-import sys
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
-from pathlib import Path
-
 import typer
+import logging
+import sys
+import json
+import os
+import asyncio
+from pathlib import Path
 from rich.console import Console
 from rich.table import Table
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
 from .index import InvertedIndex, build_partial
+from .storage import save_pickle, load_pickle
 from .models import Index
 from .search import search
-from .storage import load_pickle, save_pickle
 
 # Налаштування логування (діагностика йде в stderr)
 logging.basicConfig(
@@ -52,7 +51,6 @@ def index(
         console.print("[bold red]Error: No .txt files found in the directory.[/bold red]")
         raise typer.Exit(code=1)
 
-    # Розбиваємо файли на частини для кожного воркера
     num_workers = workers if workers > 0 else os.cpu_count() or 1
     chunk_size = (len(files) + num_workers - 1) // num_workers
     chunks = [files[i:i + chunk_size] for i in range(0, len(files), chunk_size)]
@@ -74,7 +72,6 @@ def index(
             console.print(f"[bold red]Error: Unknown executor '{executor}'[/bold red]")
             raise typer.Exit(code=1)
 
-        # Зливаємо результати
         final_index = InvertedIndex.merge(partials)
         save_pickle(final_index, out)
         console.print(f"[bold green]Index saved to {out}[/bold green]")
@@ -161,12 +158,34 @@ def crawl(
     console.print(f"Max pages: {max_pages}, Concurrency: {concurrency}")
 
     try:
-        # Запускаємо асинхронний цикл подій
         asyncio.run(run_crawl(start_url, max_pages, concurrency, out))
         console.print(f"[bold green]Crawl complete. Results saved to {out}[/bold green]")
     except Exception as e:
         console.print(f"[bold red]Crawl failed: {e}[/bold red]")
         raise typer.Exit(code=1)
+
+
+@app.command()
+def serve(
+        port: int = typer.Option(8000, "--port", "-p", help="Port to run the server on"),
+        workers: int = typer.Option(1, "--workers", "-w", help="Number of uvicorn workers")
+) -> None:
+    """Start the FastAPI web server."""
+    try:
+        import uvicorn
+    except ImportError:
+        console.print("[bold red]Error: uvicorn is not installed. Run 'uv add uvicorn'[/bold red]")
+        raise typer.Exit(code=1)
+
+    console.print(f"[bold green]Starting web server on http://0.0.0.0:{port} with {workers} workers...[/bold green]")
+
+    # Запуск uvicorn
+    uvicorn.run(
+        "findex.web.main:app",
+        host="0.0.0.0",
+        port=port,
+        workers=workers,
+    )
 
 
 if __name__ == "__main__":

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Findex Search</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .result { border-bottom: 1px solid #ccc; padding: 10px 0; }
+        .snippet { color: #555; }
+        .highlight { background-color: yellow; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Findex Search</h1>
+    <form action="/search" method="get">
+        <input type="text" name="q" placeholder="Search query..." required>
+        <button type="submit">Search</button>
+    </form>
+    <div id="results"></div>
+    <script>
+        // Простий JS для відображення результатів (якщо потрібно)
+        const urlParams = new URLSearchParams(window.location.search);
+        const q = urlParams.get('q');
+        if (q) {
+            fetch(`/search?q=${encodeURIComponent(q)}`)
+                .then(res => res.json())
+                .then(data => {
+                    const container = document.getElementById('results');
+                    data.results.forEach(r => {
+                        const div = document.createElement('div');
+                        div.className = 'result';
+                        div.innerHTML = `<h3>Doc ID: ${r.doc_id} (Score: ${r.score})</h3>
+                                         <p class="snippet">${r.snippet}</p>`;
+                        container.appendChild(div);
+                    });
+                });
+        }
+    </script>
+</body>
+</html>
