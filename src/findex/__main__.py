@@ -1,18 +1,18 @@
-import json
-import logging
-import os
-import sys
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
-from pathlib import Path
-
 import typer
+import logging
+import sys
+import json
+import os
+import asyncio
+from pathlib import Path
 from rich.console import Console
 from rich.table import Table
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
 from .index import InvertedIndex, build_partial
+from .storage import save_pickle, load_pickle
 from .models import Index
 from .search import search
-from .storage import load_pickle, save_pickle
 
 # Налаштування логування (діагностика йде в stderr)
 logging.basicConfig(
@@ -144,6 +144,28 @@ def stats(index_file: Path = typer.Argument(..., help="Path to index file")) -> 
     console.print(f"Documents: {idx.num_docs}")
     console.print(f"Unique Terms: {len(idx)}")
     console.print(f"Avg Doc Length: {idx.avg_doc_length:.2f}")
+
+
+@app.command()
+def crawl(
+        start_url: str = typer.Argument(..., help="Starting URL to crawl"),
+        max_pages: int = typer.Option(200, "--max-pages", "-m", help="Maximum number of pages to crawl"),
+        concurrency: int = typer.Option(5, "--concurrency", "-c", help="Number of concurrent requests"),
+        out: Path = typer.Option(Path("crawl.jsonl"), "--out", "-o", help="Output JSONL file")
+) -> None:
+    """Asynchronously crawl a website and save results to JSONL."""
+    from .crawler import crawl as run_crawl
+
+    console.print(f"[bold blue]Starting async crawl of {start_url}[/bold blue]")
+    console.print(f"Max pages: {max_pages}, Concurrency: {concurrency}")
+
+    try:
+        # Запускаємо асинхронний цикл подій
+        asyncio.run(run_crawl(start_url, max_pages, concurrency, out))
+        console.print(f"[bold green]Crawl complete. Results saved to {out}[/bold green]")
+    except Exception as e:
+        console.print(f"[bold red]Crawl failed: {e}[/bold red]")
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":
