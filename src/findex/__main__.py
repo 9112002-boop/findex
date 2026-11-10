@@ -1,18 +1,19 @@
-import typer
-import logging
-import sys
-import json
-import os
 import asyncio
+import json
+import logging
+import os
+import sys
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
+
+import typer
 from rich.console import Console
 from rich.table import Table
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
 from .index import InvertedIndex, build_partial
-from .storage import save_pickle, load_pickle
 from .models import Index
 from .search import search
+from .storage import load_pickle, save_pickle
 
 # Налаштування логування (діагностика йде в stderr)
 logging.basicConfig(

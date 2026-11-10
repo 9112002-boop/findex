@@ -1,4 +1,6 @@
+[lint]
 ignore = [
-    "B008",   # Typer requires calls in defaults
-    "BLE001", # CLI needs to catch all exceptions
+    "B008",
+    "BLE001",
+    "ASYNC230", # Дозволяємо блокуючий open у корутині (для простоти)
 ]

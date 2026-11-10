@@ -1,10 +1,11 @@
 import asyncio
-import random
-import logging
 import json
+import logging
+import random
 import time
-from urllib.parse import urlparse, urlunparse, urljoin
+from urllib.parse import urljoin, urlparse, urlunparse
 from urllib.robotparser import RobotFileParser
+
 import httpx
 from selectolax.lexbor import LexborHTMLParser
 
@@ -50,7 +51,7 @@ def canonicalize_url(url: str) -> str:
     parsed = urlparse(url)
     netloc = parsed.netloc.lower()
     scheme = parsed.scheme.lower()
-    path = parsed.path
+    path = parsed.path  # Не додаємо слеш!
     # Видаляємо фрагмент (#)
     return urlunparse((scheme, netloc, path, parsed.params, parsed.query, ''))
 
@@ -58,7 +59,6 @@ def canonicalize_url(url: str) -> str:
 def is_html_url(url: str) -> bool:
     """Перевіряє, чи URL веде на HTML-сторінку, а не на файл."""
     path = urlparse(url).path.lower()
-    # Ігноруємо файли з розширеннями
     ignore_exts = ('.pdf', '.zip', '.tar.gz', '.png', '.jpg', '.jpeg', '.gif', '.css', '.js', '.txt')
     return not path.endswith(ignore_exts)
 
@@ -135,49 +135,52 @@ async def crawl(start_url: str, max_pages: int, concurrency: int, output_file: s
                         queue.task_done()
                         continue
 
-                    async with host_semaphore:
-                        async with global_semaphore:
-                            resp = await fetch_with_retry(client, url)
+                    # Об'єднали вкладені async with
+                    async with host_semaphore, global_semaphore:
+                        resp = await fetch_with_retry(client, url)
 
-                            if resp is None:
-                                stats["errors"] += 1
-                                queue.task_done()
-                                continue
+                        if resp is None:
+                            stats["errors"] += 1
+                            queue.task_done()
+                            continue
 
-                            stats["pages"] += 1
-                            stats["bytes"] += len(resp.content)
+                        stats["pages"] += 1
+                        stats["bytes"] += len(resp.content)
 
-                            try:
-                                tree = LexborHTMLParser(resp.text)
-                                title = tree.css_first("title").text() if tree.css_first("title") else ""
-                                text = tree.body.text(separator=" ", strip=True) if tree.body else ""
+                        try:
+                            tree = LexborHTMLParser(resp.text)
+                            title = tree.css_first("title").text() if tree.css_first("title") else ""
+                            text = tree.body.text(separator=" ", strip=True) if tree.body else ""
 
-                                record = {
-                                    "url": url,
-                                    "status": resp.status_code,
-                                    "title": title,
-                                    "text": text[:1000],
-                                    "timestamp": time.time()
-                                }
-                                f_out.write(json.dumps(record, ensure_ascii=False) + "\n")
-                                f_out.flush()
+                            record = {
+                                "url": url,
+                                "status": resp.status_code,
+                                "title": title,
+                                "text": text[:1000],
+                                "timestamp": time.time()
+                            }
+                            f_out.write(json.dumps(record, ensure_ascii=False) + "\n")
+                            f_out.flush()
 
-                                if stats["pages"] < max_pages:
-                                    for a in tree.css("a"):
-                                        href = a.attributes.get("href")
-                                        if href:
-                                            abs_url = urljoin(url, href)
-                                            canonical_url = canonicalize_url(abs_url)
+                            if stats["pages"] < max_pages:
+                                for a in tree.css("a"):
+                                    href = a.attributes.get("href")
+                                    if href:
+                                        abs_url = urljoin(url, href)
+                                        canonical_url = canonicalize_url(abs_url)
 
-                                            # Фільтруємо: тільки той самий хост, тільки HTML, тільки нові
-                                            if urlparse(canonical_url).netloc == urlparse(start_url).netloc:
-                                                if is_html_url(canonical_url) and canonical_url not in seen:
-                                                    seen.add(canonical_url)
-                                                    await queue.put(canonical_url)
+                                        # Об'єднали вкладені if
+                                        if (
+                                                urlparse(canonical_url).netloc == urlparse(start_url).netloc
+                                                and is_html_url(canonical_url)
+                                                and canonical_url not in seen
+                                        ):
+                                            seen.add(canonical_url)
+                                            await queue.put(canonical_url)
 
-                            except Exception as e:
-                                logger.error(f"Parse error {url}: {e}")
-                                stats["errors"] += 1
+                        except Exception as e:
+                            logger.error(f"Parse error {url}: {e}")
+                            stats["errors"] += 1
 
                     queue.task_done()
 
