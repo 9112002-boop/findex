@@ -1,11 +1,17 @@
-import json
+import typer
 import logging
 import sys
+import json
+import os
 from pathlib import Path
-
-import typer
 from rich.console import Console
 from rich.table import Table
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+
+from .index import InvertedIndex, build_partial
+from .storage import save_pickle, load_pickle
+from .models import Index
+from .search import search
 
 # Налаштування логування (діагностика йде в stderr)
 logging.basicConfig(
@@ -18,17 +24,11 @@ logger = logging.getLogger("findex")
 app = typer.Typer(help="Findex Search Engine CLI")
 console = Console()
 
-# Тут будуть імпорти ваших модулів
-from .index import InvertedIndex
-from .models import Index
-from .search import search
-from .storage import load_pickle, save_pickle
-
 
 @app.callback()
 def main(
         verbose: int = typer.Option(0, "--verbose", "-v", count=True, help="Increase verbosity (-v, -vv)")
-):
+) -> None:
     if verbose == 1:
         logging.getLogger().setLevel(logging.INFO)
     elif verbose >= 2:
@@ -38,19 +38,47 @@ def main(
 @app.command()
 def index(
         data_dir: Path = typer.Argument(..., help="Directory with text files"),
-        out: Path = typer.Option(Path("index.bin"), "--out", "-o", help="Output index file")
-):
+        out: Path = typer.Option(Path("index.bin"), "--out", "-o", help="Output index file"),
+        workers: int = typer.Option(1, "--workers", "-w", help="Number of workers"),
+        executor: str = typer.Option("serial", "--executor", "-e", help="Executor type: serial, threads, processes")
+) -> None:
     """Build the inverted index from a directory of text files."""
     console.print(f"[bold blue]Building index from {data_dir}...[/bold blue]")
 
-    idx = InvertedIndex()
-    # Функція track з rich створює смугу прогресу
+    files = sorted(data_dir.glob("*.txt"))
+    if not files:
+        console.print("[bold red]Error: No .txt files found in the directory.[/bold red]")
+        raise typer.Exit(code=1)
+
+    # Розбиваємо файли на частини для кожного воркера
+    num_workers = workers if workers > 0 else os.cpu_count() or 1
+    chunk_size = (len(files) + num_workers - 1) // num_workers
+    chunks = [files[i:i + chunk_size] for i in range(0, len(files), chunk_size)]
+
+    partials = []
     try:
-        idx.build(data_dir)
-        save_pickle(idx, out)
+        if executor == "serial":
+            for i, chunk in enumerate(chunks):
+                partials.append(build_partial(chunk, start_doc_id=i * chunk_size))
+        elif executor == "threads":
+            with ThreadPoolExecutor(max_workers=num_workers) as pool:
+                futures = [pool.submit(build_partial, chunk, i * chunk_size) for i, chunk in enumerate(chunks)]
+                partials = [f.result() for f in futures]
+        elif executor == "processes":
+            with ProcessPoolExecutor(max_workers=num_workers) as pool:
+                futures = [pool.submit(build_partial, chunk, i * chunk_size) for i, chunk in enumerate(chunks)]
+                partials = [f.result() for f in futures]
+        else:
+            console.print(f"[bold red]Error: Unknown executor '{executor}'[/bold red]")
+            raise typer.Exit(code=1)
+
+        # Зливаємо результати
+        final_index = InvertedIndex.merge(partials)
+        save_pickle(final_index, out)
         console.print(f"[bold green]Index saved to {out}[/bold green]")
+
     except Exception as e:
-        console.print(f"[bold red]Error: {e}[/bold red]")
+        console.print(f"[bold red]Error during indexing: {e}[/bold red]")
         raise typer.Exit(code=1)
 
 
@@ -60,7 +88,7 @@ def search_cmd(
         query: str = typer.Argument(..., help="Search query"),
         scorer: str = typer.Option("tfidf", "--scorer", help="Ranking algorithm (tfidf or bm25)"),
         json_out: bool = typer.Option(False, "--json", help="Output results as JSON")
-):
+) -> None:
     """Search the index with a query."""
     if not index_file.exists():
         console.print(f"[bold red]Error: Index file '{index_file}' not found.[/bold red]")
@@ -70,7 +98,6 @@ def search_cmd(
         data = load_pickle(index_file)
         idx = Index(postings=data['postings'], doc_meta=data['doc_meta'])
 
-        # Завантаження корпусу для сніпетів
         corpus_dict = {}
         data_dir = Path("data")
         if data_dir.exists():
@@ -81,7 +108,6 @@ def search_cmd(
         results = search(idx, query, scorer_type=scorer, corpus_dict=corpus_dict)
 
         if json_out:
-            # Вивід у stdout для перенаправлення
             output = [{"doc_id": r.doc_id, "score": r.score, "snippet": r.snippet} for r in results]
             typer.echo(json.dumps(output))
         else:
@@ -104,7 +130,7 @@ def search_cmd(
 
 
 @app.command()
-def stats(index_file: Path = typer.Argument(..., help="Path to index file")):
+def stats(index_file: Path = typer.Argument(..., help="Path to index file")) -> None:
     """Show statistics about the index."""
     if not index_file.exists():
         console.print(f"[bold red]Error: Index file '{index_file}' not found.[/bold red]")

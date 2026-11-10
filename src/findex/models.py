@@ -1,6 +1,7 @@
-from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from functools import cached_property
+from collections.abc import Mapping
+from typing import Iterator
 
 
 @dataclass(frozen=True, slots=True)
@@ -9,10 +10,12 @@ class DocMeta:
     title: str
     length: int
 
+
 @dataclass(frozen=True, slots=True)
 class Posting:
     doc_id: int
     freq: int
+
 
 @dataclass(order=True)
 class SearchResult:
@@ -20,10 +23,13 @@ class SearchResult:
     doc_id: int
     snippet: str = ""
 
+
 class Index(Mapping[str, list[Posting]]):
+    """Обгортка над словником постінгів, що реалізує протокол Mapping."""
+
     def __init__(self, postings: dict[str, list[Posting]], doc_meta: dict[int, DocMeta]) -> None:
-        self._postings: dict[str, list[Posting]] = postings
-        self.doc_meta: dict[int, DocMeta] = doc_meta
+        self._postings = postings
+        self.doc_meta = doc_meta
 
     def __getitem__(self, term: str) -> list[Posting]:
         return self._postings[term]
@@ -33,6 +39,9 @@ class Index(Mapping[str, list[Posting]]):
 
     def __len__(self) -> int:
         return len(self._postings)
+
+    def __repr__(self) -> str:
+        return f"<Index: {len(self)} terms, {len(self.doc_meta)} docs>"
 
     @property
     def num_docs(self) -> int:
@@ -46,4 +55,5 @@ class Index(Mapping[str, list[Posting]]):
         return total_len / len(self.doc_meta)
 
     def df(self, term: str) -> int:
+        """Document Frequency - кількість документів, де зустрічається термін."""
         return len(self._postings.get(term, []))
